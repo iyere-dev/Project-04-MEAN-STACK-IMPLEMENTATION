@@ -105,6 +105,7 @@ In the books directory, Initialise npm project
 
 ![Initialising npm project](./images/installing_mongodb/initialising_npm_project.png)
 
+
 Add file named srever.js and paste configuration below:
 
 
@@ -120,10 +121,248 @@ app.listen(app.get('port'), function() {
 });
 
 
+`vi server.js`
+
 ![Server.js configuration code](./images/installing_mongodb/server.js_configuration.png)
 
 
+INSTALL EXPRESS AND SET UP ROUTES TO THE SERVER
+
+Express is a minimal and flexible Node.js web application framework that provides features for web and mobile applications. We will use Express to pass book information to and from our MongoDB database.
+
+We also will use Mongoose package which provides a straight-forward, schema-based solution to model your application data. We will use Mongoose to establish a schema for the database to store data of our book register
 
 
-`vi server,js`
+`sudo npm install express mongoose`
 
+![installing express and mongoose](./images/express_and_routes_setup/installing_express_and_mongoose.png)
+
+In Books folder, create  a folder named apps and change directory to apps
+
+`mkdir apps && cd apps`
+
+Create a file named routes.js and copy and paste file below into it:
+
+
+const Book = require('./models/book');
+
+module.exports = function(app){
+  app.get('/book', function(req, res){
+    Book.find({}).then(result => {
+      res.json(result);
+    }).catch(err => {
+      console.error(err);
+      res.status(500).send('An error occurred while retrieving books');
+    });
+  });
+
+  app.post('/book', function(req, res){
+    const book = new Book({
+      name: req.body.name,
+      isbn: req.body.isbn,
+      author: req.body.author,
+      pages: req.body.pages
+    });
+    book.save().then(result => {
+      res.json({
+        message: "Successfully added book",
+        book: result
+      });
+    }).catch(err => {
+      console.error(err);
+      res.status(500).send('An error occurred while saving the book');
+    });
+  });
+
+  app.delete("/book/:isbn", function(req, res){
+    Book.findOneAndRemove(req.query).then(result => {
+      res.json({
+        message: "Successfully deleted the book",
+        book: result
+      });
+    }).catch(err => {
+      console.error(err);
+      res.status(500).send('An error occurred while deleting the book');
+    });
+  });
+
+  const path = require('path');
+  app.get('*', function(req, res){
+    res.sendFile(path.join(__dirname, 'public', 'index.html'));
+  });
+};
+
+
+
+
+`vi routes.js`
+
+![routes.js configuration](./images/express_and_routes_setup/routes.js_configuration_file.png)
+
+in apps folder, create a folder named models and cd into models
+
+`mkdir models && cd models`
+
+create a file named book.js then copy and paste code below into it:
+
+var mongoose = require('mongoose');
+var dbHost = 'mongodb://localhost:27017/test';
+mongoose.connect(dbHost);
+mongoose.connection;
+mongoose.set('debug', true);
+var bookSchema = mongoose.Schema( {
+  name: String,
+  isbn: {type: String, index: true},
+  author: String,
+  pages: Number
+});
+var Book = mongoose.model('Book', bookSchema);
+module.exports = mongoose.model('Book', bookSchema);
+
+
+`vi books.js`
+
+![books.js configuration](./images/express_and_routes_setup/books.js_configuration.png)
+
+
+ACCESS THE routes WITH AngularJS
+
+AngularJS provides a web framework for creating dynamic views in your web applications. In this tutorial, we use AngularJS to connect our web page with Express and perform actions on our book register.
+
+Change the directory back to ‘Books’
+
+`cd ../..`
+
+Create a folder named 'public' and cd into 'public'
+
+`mkdir public && cd public`
+
+Add file named script.js and paste code below (controller configuration defined) into it:
+
+var app = angular.module('myApp', []);
+app.controller('myCtrl', function($scope, $http) {
+  $http( {
+    method: 'GET',
+    url: '/book'
+  }).then(function successCallback(response) {
+    $scope.books = response.data;
+  }, function errorCallback(response) {
+    console.log('Error: ' + response);
+  });
+  $scope.del_book = function(book) {
+    $http( {
+      method: 'DELETE',
+      url: '/book/:isbn',
+      params: {'isbn': book.isbn}
+    }).then(function successCallback(response) {
+      console.log(response);
+    }, function errorCallback(response) {
+      console.log('Error: ' + response);
+    });
+  };
+  $scope.add_book = function() {
+    var body = '{ "name": "' + $scope.Name + 
+    '", "isbn": "' + $scope.Isbn +
+    '", "author": "' + $scope.Author + 
+    '", "pages": "' + $scope.Pages + '" }';
+    $http({
+      method: 'POST',
+      url: '/book',
+      data: body
+    }).then(function successCallback(response) {
+      console.log(response);
+    }, function errorCallback(response) {
+      console.log('Error: ' + response);
+    });
+  };
+});
+
+
+`vi script.js`
+
+![script.js configuration](./images/express_and_routes_setup/script.js_configuration_code.png)
+
+In public folder, create a file named index.html and paste code below into it:
+
+<!doctype html>
+<html ng-app="myApp" ng-controller="myCtrl">
+  <head>
+    <script src="https://ajax.googleapis.com/ajax/libs/angularjs/1.6.4/angular.min.js"></script>
+    <script src="script.js"></script>
+  </head>
+  <body>
+    <div>
+      <table>
+        <tr>
+          <td>Name:</td>
+          <td><input type="text" ng-model="Name"></td>
+        </tr>
+        <tr>
+          <td>Isbn:</td>
+          <td><input type="text" ng-model="Isbn"></td>
+        </tr>
+        <tr>
+          <td>Author:</td>
+          <td><input type="text" ng-model="Author"></td>
+        </tr>
+        <tr>
+          <td>Pages:</td>
+          <td><input type="number" ng-model="Pages"></td>
+        </tr>
+      </table>
+      <button ng-click="add_book()">Add</button>
+    </div>
+    <hr>
+    <div>
+      <table>
+        <tr>
+          <th>Name</th>
+          <th>Isbn</th>
+          <th>Author</th>
+          <th>Pages</th>
+
+        </tr>
+        <tr ng-repeat="book in books">
+          <td>{{book.name}}</td>
+          <td>{{book.isbn}}</td>
+          <td>{{book.author}}</td>
+          <td>{{book.pages}}</td>
+
+          <td><input type="button" value="Delete" data-ng-click="del_book(book)"></td>
+        </tr>
+      </table>
+    </div>
+  </body>
+</html>
+
+
+
+`vi index.html`
+
+![index.html configuration](./images/express_and_routes_setup/index.html_configuration_code.png)
+
+Change back to Books directory
+
+`cd ..`
+
+start server by running command below:
+
+`node server.js`
+
+![Server up and running](./images/express_and_routes_setup/node_server.js_response_server_running.png)
+
+The server is now up and running, we can connect it via port 3300. You can launch a separate Putty or SSH console to test what curl command returns locally.
+
+`curl -s http://localhost:3300`
+
+![curl response](./images/express_and_routes_setup/curl_response.png)
+
+Open TCP port 3300 in AWS console to be able to access url vis browser
+
+![opening TCP port 3300](./images/express_and_routes_setup/opening_TCP_port_3300.png)
+
+Access book reister app in browser
+
+![Accessing book register app in browser](./images/express_and_routes_setup/accessing_app_in_browser.png)
+
+END OF PROJECT!
